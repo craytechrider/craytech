@@ -1,0 +1,1343 @@
+import React, { useEffect, useState } from "react";
+import {
+  User,
+  Mail,
+  Phone,
+  LockKeyhole,
+  Eye,
+  EyeOff,
+  Save,
+  Truck,
+  Store,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Settings as SettingsIcon,
+  ShieldCheck,
+  ChevronRight,
+} from "lucide-react";
+
+import api from "../../lib/api";
+
+const BLUE = "#1557C0";
+const BLUE_DARK = "#0D47A1";
+const NAVY = "#122B5C";
+const ORANGE = "#F59E0B";
+
+interface Profile {
+  name: string;
+  email: string;
+  phone: string;
+}
+
+type SettingsTab = "profile" | "delivery" | "security";
+
+const Settings: React.FC = () => {
+  // ============================================================
+  // ACTIVE TAB
+  // ============================================================
+
+  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+
+  // ============================================================
+  // PROFILE
+  // ============================================================
+
+  const [profile, setProfile] = useState<Profile>({
+    name: "",
+    email: "",
+    phone: "",
+  });
+
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // ============================================================
+  // PASSWORD
+  // ============================================================
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  // ============================================================
+  // DELIVERY
+  // ============================================================
+
+  const [deliveryEnabled, setDeliveryEnabled] = useState(true);
+
+  const [loadingDelivery, setLoadingDelivery] = useState(true);
+
+  const [savingDelivery, setSavingDelivery] = useState(false);
+
+  // ============================================================
+  // MESSAGE
+  // ============================================================
+
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  // ============================================================
+  // LOAD SETTINGS
+  // ============================================================
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      setLoadingProfile(true);
+      setLoadingDelivery(true);
+
+      setError("");
+
+      // ----------------------------------------------------------
+      // PROFILE
+      // ----------------------------------------------------------
+
+      const profileResponse = await api.get("/settings");
+
+      console.log("Settings response:", profileResponse.data);
+
+      const profileData =
+        profileResponse.data?.data ||
+        profileResponse.data?.user ||
+        profileResponse.data;
+
+      if (profileData) {
+        setProfile({
+          name: profileData.name || "",
+          email: profileData.email || "",
+          phone: profileData.phone || profileData.contact_number || "",
+        });
+      }
+
+      // ----------------------------------------------------------
+      // SYSTEM SETTINGS
+      // ----------------------------------------------------------
+
+      const deliveryResponse = await api.get("/system-settings");
+
+      console.log("System settings response:", deliveryResponse.data);
+
+      const enabled = deliveryResponse.data?.data?.delivery_enabled;
+
+      setDeliveryEnabled(enabled === undefined ? true : Boolean(enabled));
+    } catch (err: any) {
+      console.error("Failed to load settings:", err);
+
+      setError(err?.response?.data?.message || "Unable to load settings.");
+    } finally {
+      setLoadingProfile(false);
+      setLoadingDelivery(false);
+    }
+  };
+
+  // ============================================================
+  // PROFILE CHANGE
+  // ============================================================
+
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+
+    setProfile((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  };
+
+  // ============================================================
+  // SAVE PROFILE
+  // ============================================================
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (savingProfile) return;
+
+    setSavingProfile(true);
+    setMessage("");
+    setError("");
+
+    try {
+      await api.put("/settings/profile", {
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone,
+      });
+
+      setMessage("Profile information updated successfully.");
+    } catch (err: any) {
+      console.error("Profile update error:", err);
+
+      setError(err?.response?.data?.message || "Failed to update profile.");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  // ============================================================
+  // CHANGE PASSWORD
+  // ============================================================
+
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (savingPassword) return;
+
+    setMessage("");
+    setError("");
+
+    if (newPassword.length < 8) {
+      setError("New password must be at least 8 characters.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError("New password and confirmation password do not match.");
+      return;
+    }
+
+    setSavingPassword(true);
+
+    try {
+      await api.put("/settings/password", {
+        current_password: currentPassword,
+        new_password: newPassword,
+        new_password_confirmation: confirmPassword,
+      });
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+
+      setMessage("Password updated successfully.");
+    } catch (err: any) {
+      console.error("Password update error:", err);
+
+      setError(err?.response?.data?.message || "Failed to update password.");
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  // ============================================================
+  // DELIVERY TOGGLE
+  // ============================================================
+
+  const handleDeliveryToggle = async () => {
+    if (savingDelivery || loadingDelivery) {
+      return;
+    }
+
+    const newValue = !deliveryEnabled;
+
+    setSavingDelivery(true);
+    setMessage("");
+    setError("");
+
+    try {
+      const response = await api.put("/system-settings/delivery", {
+        delivery_enabled: newValue,
+      });
+
+      console.log("Delivery setting response:", response.data);
+
+      setDeliveryEnabled(newValue);
+
+      setMessage(
+        newValue
+          ? "Delivery has been enabled successfully."
+          : "Delivery has been disabled successfully.",
+      );
+    } catch (err: any) {
+      console.error("Delivery setting error:", err);
+
+      setError(
+        err?.response?.data?.message || "Failed to update delivery setting.",
+      );
+    } finally {
+      setSavingDelivery(false);
+    }
+  };
+
+  // ============================================================
+  // CLEAR MESSAGES
+  // ============================================================
+
+  const clearMessages = () => {
+    setMessage("");
+    setError("");
+  };
+
+  // ============================================================
+  // TAB INFORMATION
+  // ============================================================
+
+  const tabs = [
+    {
+      id: "profile" as SettingsTab,
+      label: "Profile",
+      description: "Account information",
+      icon: User,
+    },
+    {
+      id: "delivery" as SettingsTab,
+      label: "Delivery",
+      description: "Order fulfillment",
+      icon: Truck,
+    },
+    {
+      id: "security" as SettingsTab,
+      label: "Security",
+      description: "Password & security",
+      icon: ShieldCheck,
+    },
+  ];
+
+  // ============================================================
+  // INPUT CLASS
+  // ============================================================
+
+  const inputClass = `
+    w-full
+    rounded-xl
+    border
+    border-gray-200
+    bg-gray-50
+    py-3
+    pl-11
+    pr-4
+    text-sm
+    text-gray-800
+    outline-none
+    transition
+    placeholder:text-gray-400
+    focus:border-[#1557C0]
+    focus:bg-white
+    focus:ring-4
+    focus:ring-blue-100
+  `;
+
+  const passwordInputClass = `
+    w-full
+    rounded-xl
+    border
+    border-gray-200
+    bg-gray-50
+    px-4
+    py-3
+    pr-12
+    text-sm
+    text-gray-800
+    outline-none
+    transition
+    placeholder:text-gray-400
+    focus:border-[#1557C0]
+    focus:bg-white
+    focus:ring-4
+    focus:ring-blue-100
+  `;
+
+  // ============================================================
+  // PAGE
+  // ============================================================
+
+  return (
+    <div className="min-h-screen bg-[#F5F8FC]">
+      {/* ======================================================
+          PAGE HEADER
+      ====================================================== */}
+
+      <div className="mb-6">
+        <div className="flex items-center gap-3">
+          <div
+            className="
+              flex
+              h-11
+              w-11
+              items-center
+              justify-center
+              rounded-xl
+              bg-blue-50
+              text-[#1557C0]
+            "
+          >
+            <SettingsIcon size={22} />
+          </div>
+
+          <div>
+            <h1
+              className="
+                text-2xl
+                font-extrabold
+                tracking-tight
+                text-[#122B5C]
+              "
+            >
+              Settings
+            </h1>
+
+            <p className="mt-1 text-sm text-gray-500">
+              Manage your CRAYTECH account and system settings.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ======================================================
+          ALERTS
+      ====================================================== */}
+
+      {message && (
+        <div
+          className="
+            mb-5
+            flex
+            items-start
+            gap-3
+            rounded-xl
+            border
+            border-green-200
+            bg-green-50
+            p-4
+          "
+        >
+          <CheckCircle2 size={19} className="mt-0.5 shrink-0 text-green-600" />
+
+          <div>
+            <p className="text-sm font-bold text-green-700">Success</p>
+
+            <p className="mt-1 text-xs text-green-600">{message}</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={clearMessages}
+            className="
+              ml-auto
+              text-xs
+              font-bold
+              text-green-600
+              hover:text-green-800
+            "
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <div
+          className="
+            mb-5
+            flex
+            items-start
+            gap-3
+            rounded-xl
+            border
+            border-red-200
+            bg-red-50
+            p-4
+          "
+        >
+          <AlertCircle size={19} className="mt-0.5 shrink-0 text-red-600" />
+
+          <div>
+            <p className="text-sm font-bold text-red-700">
+              Something went wrong
+            </p>
+
+            <p className="mt-1 text-xs text-red-600">{error}</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={clearMessages}
+            className="
+              ml-auto
+              text-xs
+              font-bold
+              text-red-600
+              hover:text-red-800
+            "
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* ======================================================
+          SETTINGS CONTAINER
+      ====================================================== */}
+
+      <div
+        className="
+          overflow-hidden
+          rounded-2xl
+          border
+          border-gray-200
+          bg-white
+          shadow-sm
+        "
+      >
+        {/* ====================================================
+            MOBILE TAB MENU
+        ==================================================== */}
+
+        <div className="border-b border-gray-200 lg:hidden">
+          <div className="flex overflow-x-auto">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.id;
+
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    clearMessages();
+                  }}
+                  className={`
+                    flex
+                    min-w-[140px]
+                    flex-1
+                    items-center
+                    justify-center
+                    gap-2
+                    border-b-2
+                    px-4
+                    py-4
+                    text-sm
+                    font-bold
+                    transition
+                    ${
+                      active
+                        ? "border-[#1557C0] text-[#1557C0] bg-blue-50/40"
+                        : "border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                    }
+                  `}
+                >
+                  <Icon size={18} />
+
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex min-h-[620px] flex-col lg:flex-row">
+          {/* ==================================================
+              LEFT SETTINGS NAVIGATION
+          ================================================== */}
+
+          <aside
+            className="
+              hidden
+              w-[270px]
+              shrink-0
+              border-r
+              border-gray-200
+              bg-[#FAFBFD]
+              lg:block
+            "
+          >
+            <div className="p-5">
+              <div className="mb-5 px-2">
+                <p
+                  className="
+                    text-[11px]
+                    font-extrabold
+                    uppercase
+                    tracking-[0.15em]
+                    text-gray-400
+                  "
+                >
+                  Settings
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const active = activeTab === tab.id;
+
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveTab(tab.id);
+                        clearMessages();
+                      }}
+                      className={`
+                        group
+                        flex
+                        w-full
+                        items-center
+                        gap-3
+                        rounded-xl
+                        px-3
+                        py-3
+                        text-left
+                        transition
+                        ${
+                          active
+                            ? "bg-white text-[#1557C0] shadow-sm ring-1 ring-blue-100"
+                            : "text-gray-600 hover:bg-white hover:text-[#1557C0]"
+                        }
+                      `}
+                    >
+                      <div
+                        className={`
+                          flex
+                          h-10
+                          w-10
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-xl
+                          transition
+                          ${
+                            active
+                              ? "bg-blue-50 text-[#1557C0]"
+                              : "bg-gray-100 text-gray-500 group-hover:bg-blue-50 group-hover:text-[#1557C0]"
+                          }
+                        `}
+                      >
+                        <Icon size={19} />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold">{tab.label}</p>
+
+                        <p className="mt-0.5 truncate text-[11px] text-gray-400">
+                          {tab.description}
+                        </p>
+                      </div>
+
+                      <ChevronRight
+                        size={16}
+                        className={`
+                          shrink-0
+                          transition
+                          ${active ? "text-[#1557C0]" : "text-gray-300"}
+                        `}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* SIDEBAR INFO */}
+
+              <div
+                className="
+                  mt-8
+                  rounded-xl
+                  border
+                  border-blue-100
+                  bg-blue-50
+                  p-4
+                "
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <SettingsIcon size={16} className="text-[#1557C0]" />
+
+                  <p className="text-xs font-bold text-[#1557C0]">CRAYTECH</p>
+                </div>
+
+                <p className="text-[11px] leading-5 text-blue-700">
+                  Manage your farm management system, administrator account, and
+                  customer fulfillment options.
+                </p>
+              </div>
+            </div>
+          </aside>
+
+          {/* ==================================================
+              RIGHT CONTENT
+          ================================================== */}
+
+          <section className="min-w-0 flex-1">
+            {/* =================================================
+                PROFILE
+            ================================================= */}
+
+            {activeTab === "profile" && (
+              <div className="p-5 sm:p-7 lg:p-8">
+                <div className="mb-7">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="
+                        flex
+                        h-11
+                        w-11
+                        items-center
+                        justify-center
+                        rounded-xl
+                        bg-blue-50
+                        text-[#1557C0]
+                      "
+                    >
+                      <User size={21} />
+                    </div>
+
+                    <div>
+                      <h2 className="text-lg font-bold text-[#122B5C]">
+                        Profile
+                      </h2>
+
+                      <p className="mt-1 text-sm text-gray-500">
+                        Update your administrator account information.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {loadingProfile ? (
+                  <div className="flex items-center gap-3 py-16 text-sm text-gray-500">
+                    <Loader2
+                      size={20}
+                      className="animate-spin text-[#1557C0]"
+                    />
+                    Loading account information...
+                  </div>
+                ) : (
+                  <form onSubmit={handleProfileUpdate}>
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      {/* NAME */}
+
+                      <div>
+                        <label
+                          htmlFor="name"
+                          className="mb-2 block text-sm font-semibold text-gray-700"
+                        >
+                          Full Name
+                        </label>
+
+                        <div className="relative">
+                          <User
+                            size={18}
+                            className="
+                              absolute
+                              left-4
+                              top-1/2
+                              -translate-y-1/2
+                              text-gray-400
+                            "
+                          />
+
+                          <input
+                            id="name"
+                            name="name"
+                            type="text"
+                            value={profile.name}
+                            onChange={handleProfileChange}
+                            required
+                            placeholder="Enter your name"
+                            className={inputClass}
+                          />
+                        </div>
+                      </div>
+
+                      {/* EMAIL */}
+
+                      <div>
+                        <label
+                          htmlFor="email"
+                          className="mb-2 block text-sm font-semibold text-gray-700"
+                        >
+                          Email Address
+                        </label>
+
+                        <div className="relative">
+                          <Mail
+                            size={18}
+                            className="
+                              absolute
+                              left-4
+                              top-1/2
+                              -translate-y-1/2
+                              text-gray-400
+                            "
+                          />
+
+                          <input
+                            id="email"
+                            name="email"
+                            type="email"
+                            value={profile.email}
+                            onChange={handleProfileChange}
+                            required
+                            placeholder="Enter your email"
+                            className={inputClass}
+                          />
+                        </div>
+                      </div>
+
+                      {/* PHONE */}
+
+                      <div className="md:col-span-2">
+                        <label
+                          htmlFor="phone"
+                          className="mb-2 block text-sm font-semibold text-gray-700"
+                        >
+                          Phone Number
+                        </label>
+
+                        <div className="relative max-w-xl">
+                          <Phone
+                            size={18}
+                            className="
+                              absolute
+                              left-4
+                              top-1/2
+                              -translate-y-1/2
+                              text-gray-400
+                            "
+                          />
+
+                          <input
+                            id="phone"
+                            name="phone"
+                            type="text"
+                            value={profile.phone}
+                            onChange={handleProfileChange}
+                            placeholder="Enter your phone number"
+                            className={inputClass}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SAVE */}
+
+                    <div
+                      className="
+                        mt-8
+                        flex
+                        justify-end
+                        border-t
+                        border-gray-100
+                        pt-6
+                      "
+                    >
+                      <button
+                        type="submit"
+                        disabled={savingProfile}
+                        className="
+                          flex
+                          items-center
+                          gap-2
+                          rounded-xl
+                          bg-[#1557C0]
+                          px-6
+                          py-3
+                          text-sm
+                          font-bold
+                          text-white
+                          shadow-sm
+                          transition
+                          hover:bg-[#0D47A1]
+                          hover:shadow-md
+                          disabled:cursor-not-allowed
+                          disabled:opacity-50
+                        "
+                      >
+                        {savingProfile ? (
+                          <>
+                            <Loader2 size={17} className="animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save size={17} />
+                            Save Changes
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* =================================================
+                DELIVERY
+            ================================================= */}
+
+            {activeTab === "delivery" && (
+              <div className="p-5 sm:p-7 lg:p-8">
+                <div className="mb-7">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="
+                        flex
+                        h-11
+                        w-11
+                        items-center
+                        justify-center
+                        rounded-xl
+                        bg-orange-50
+                        text-orange-500
+                      "
+                    >
+                      <Truck size={21} />
+                    </div>
+
+                    <div>
+                      <h2 className="text-lg font-bold text-[#122B5C]">
+                        Delivery
+                      </h2>
+
+                      <p className="mt-1 text-sm text-gray-500">
+                        Control how customers receive their orders.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="
+                    rounded-2xl
+                    border
+                    border-gray-200
+                    bg-[#FAFBFD]
+                    p-5
+                    sm:p-6
+                  "
+                >
+                  <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-4">
+                      <div
+                        className={`
+                          flex
+                          h-14
+                          w-14
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-2xl
+                          ${
+                            deliveryEnabled
+                              ? "bg-green-100 text-green-600"
+                              : "bg-gray-200 text-gray-500"
+                          }
+                        `}
+                      >
+                        {deliveryEnabled ? (
+                          <Truck size={25} />
+                        ) : (
+                          <Store size={25} />
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-bold text-gray-800">
+                            Customer Delivery
+                          </h3>
+
+                          <span
+                            className={`
+                              rounded-full
+                              px-2.5
+                              py-1
+                              text-[10px]
+                              font-bold
+                              uppercase
+                              tracking-wide
+                              ${
+                                deliveryEnabled
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-gray-200 text-gray-600"
+                              }
+                            `}
+                          >
+                            {deliveryEnabled ? "Enabled" : "Disabled"}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 max-w-xl text-sm leading-6 text-gray-500">
+                          {deliveryEnabled
+                            ? "Customers can choose between Delivery and Pickup during checkout."
+                            : "Delivery is currently unavailable. Customers can only choose Pickup."}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* TOGGLE */}
+
+                    <button
+                      type="button"
+                      onClick={handleDeliveryToggle}
+                      disabled={savingDelivery || loadingDelivery}
+                      aria-label={
+                        deliveryEnabled ? "Disable delivery" : "Enable delivery"
+                      }
+                      className="
+                        flex
+                        shrink-0
+                        items-center
+                        gap-3
+                        disabled:cursor-not-allowed
+                        disabled:opacity-50
+                      "
+                    >
+                      <span
+                        className={`
+                          text-sm
+                          font-bold
+                          ${
+                            deliveryEnabled ? "text-green-600" : "text-gray-500"
+                          }
+                        `}
+                      >
+                        {savingDelivery
+                          ? "Saving..."
+                          : deliveryEnabled
+                            ? "ON"
+                            : "OFF"}
+                      </span>
+
+                      <div
+                        className={`
+                          relative
+                          h-8
+                          w-16
+                          rounded-full
+                          p-1
+                          transition-colors
+                          duration-200
+                          ${deliveryEnabled ? "bg-green-500" : "bg-gray-300"}
+                        `}
+                      >
+                        <div
+                          className={`
+                            h-6
+                            w-6
+                            rounded-full
+                            bg-white
+                            shadow-md
+                            transition-transform
+                            duration-200
+                            ${
+                              deliveryEnabled
+                                ? "translate-x-8"
+                                : "translate-x-0"
+                            }
+                          `}
+                        />
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* INFORMATION */}
+
+                <div
+                  className="
+                    mt-5
+                    flex
+                    items-start
+                    gap-3
+                    rounded-xl
+                    border
+                    border-blue-100
+                    bg-blue-50
+                    p-4
+                  "
+                >
+                  <Truck size={18} className="mt-0.5 shrink-0 text-[#1557C0]" />
+
+                  <div>
+                    <p className="text-sm font-semibold text-[#1557C0]">
+                      How this works
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5 text-blue-700">
+                      When delivery is enabled, customers can choose Delivery or
+                      Pickup during checkout. When disabled, only Pickup is
+                      available.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* =================================================
+                SECURITY
+            ================================================= */}
+
+            {activeTab === "security" && (
+              <div className="p-5 sm:p-7 lg:p-8">
+                <div className="mb-7">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="
+                        flex
+                        h-11
+                        w-11
+                        items-center
+                        justify-center
+                        rounded-xl
+                        bg-blue-50
+                        text-[#1557C0]
+                      "
+                    >
+                      <ShieldCheck size={21} />
+                    </div>
+
+                    <div>
+                      <h2 className="text-lg font-bold text-[#122B5C]">
+                        Security
+                      </h2>
+
+                      <p className="mt-1 text-sm text-gray-500">
+                        Keep your CRAYTECH administrator account secure.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <form onSubmit={handlePasswordUpdate}>
+                  <div className="max-w-2xl space-y-6">
+                    {/* CURRENT PASSWORD */}
+
+                    <div>
+                      <label
+                        htmlFor="current_password"
+                        className="mb-2 block text-sm font-semibold text-gray-700"
+                      >
+                        Current Password
+                      </label>
+
+                      <div className="relative">
+                        <input
+                          id="current_password"
+                          type={showCurrentPassword ? "text" : "password"}
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          required
+                          placeholder="Enter current password"
+                          className={passwordInputClass}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowCurrentPassword((value) => !value)
+                          }
+                          className="
+                            absolute
+                            right-4
+                            top-1/2
+                            -translate-y-1/2
+                            text-gray-400
+                            transition
+                            hover:text-gray-700
+                          "
+                        >
+                          {showCurrentPassword ? (
+                            <EyeOff size={18} />
+                          ) : (
+                            <Eye size={18} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* NEW PASSWORD */}
+
+                    <div>
+                      <label
+                        htmlFor="new_password"
+                        className="mb-2 block text-sm font-semibold text-gray-700"
+                      >
+                        New Password
+                      </label>
+
+                      <div className="relative">
+                        <input
+                          id="new_password"
+                          type={showNewPassword ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          minLength={8}
+                          required
+                          placeholder="Minimum 8 characters"
+                          className={passwordInputClass}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword((value) => !value)}
+                          className="
+                            absolute
+                            right-4
+                            top-1/2
+                            -translate-y-1/2
+                            text-gray-400
+                            transition
+                            hover:text-gray-700
+                          "
+                        >
+                          {showNewPassword ? (
+                            <EyeOff size={18} />
+                          ) : (
+                            <Eye size={18} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* CONFIRM PASSWORD */}
+
+                    <div>
+                      <label
+                        htmlFor="confirm_password"
+                        className="mb-2 block text-sm font-semibold text-gray-700"
+                      >
+                        Confirm New Password
+                      </label>
+
+                      <div className="relative">
+                        <input
+                          id="confirm_password"
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          minLength={8}
+                          required
+                          placeholder="Re-enter your new password"
+                          className={passwordInputClass}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowConfirmPassword((value) => !value)
+                          }
+                          className="
+                            absolute
+                            right-4
+                            top-1/2
+                            -translate-y-1/2
+                            text-gray-400
+                            transition
+                            hover:text-gray-700
+                          "
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff size={18} />
+                          ) : (
+                            <Eye size={18} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECURITY NOTICE */}
+
+                  <div
+                    className="
+                      mt-6
+                      flex
+                      max-w-2xl
+                      items-start
+                      gap-3
+                      rounded-xl
+                      border
+                      border-orange-100
+                      bg-orange-50
+                      p-4
+                    "
+                  >
+                    <LockKeyhole
+                      size={19}
+                      className="mt-0.5 shrink-0 text-orange-500"
+                    />
+
+                    <div>
+                      <p className="text-sm font-semibold text-orange-700">
+                        Password Security
+                      </p>
+
+                      <p className="mt-1 text-xs leading-5 text-orange-600">
+                        Use at least 8 characters and avoid using easily guessed
+                        information.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* BUTTON */}
+
+                  <div
+                    className="
+                      mt-8
+                      flex
+                      justify-end
+                      border-t
+                      border-gray-100
+                      pt-6
+                    "
+                  >
+                    <button
+                      type="submit"
+                      disabled={savingPassword}
+                      className="
+                        flex
+                        items-center
+                        gap-2
+                        rounded-xl
+                        bg-[#122B5C]
+                        px-6
+                        py-3
+                        text-sm
+                        font-bold
+                        text-white
+                        shadow-sm
+                        transition
+                        hover:bg-[#0D2147]
+                        hover:shadow-md
+                        disabled:cursor-not-allowed
+                        disabled:opacity-50
+                      "
+                    >
+                      {savingPassword ? (
+                        <>
+                          <Loader2 size={17} className="animate-spin" />
+                          Updating Password...
+                        </>
+                      ) : (
+                        <>
+                          <LockKeyhole size={17} />
+                          Change Password
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Settings;
